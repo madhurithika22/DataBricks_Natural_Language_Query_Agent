@@ -68,6 +68,31 @@ def get_database_schema() -> str:
         "schema_context": result["schema_context"],
     })
 
+@function_tool
+async def query_sales_data(user_question: str) -> str:
+    """
+    Answer a natural-language question about actual sales data.
+
+    This tool retrieves the live schema, generates a SQL query,
+    checks for ambiguity, validates the query, and executes it
+    through the approved read-only SQL workflow.
+
+    Use this tool whenever a user asks for numerical results,
+    aggregations, rankings, comparisons, lists, or other answers
+    that require querying actual sales records.
+
+    Do not invent or estimate results. Report clarification
+    requests and execution errors honestly.
+    """
+
+    result = await answer_data_question(user_question)
+
+    return json.dumps(
+        result,
+        indent=2,
+        default=str,
+    )
+    
 async def init_mcp_server(workspace_client: WorkspaceClient):
     return McpServer(
         url=build_mcp_url("/api/2.0/mcp/functions/system/ai", workspace_client=workspace_client),
