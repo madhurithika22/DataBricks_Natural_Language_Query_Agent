@@ -17,6 +17,7 @@ dependencies = [
     "python-dotenv>=1.2.1",
     "opentelemetry-exporter-otlp-proto-grpc>=1.25.0",
     "databricks-sql-connector",
+    "sqlglot>=30.20.0",
 ]
 
 [build-system]
