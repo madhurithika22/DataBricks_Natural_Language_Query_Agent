@@ -68,6 +68,7 @@ TABLE_RELATIONSHIPS = [
 # SQL Warehouse connection
 # ---------------------------------------------------------
 
+
 def get_sql_connection():
     """
     Create a SQL Warehouse connection using the app's
@@ -91,9 +92,7 @@ def get_sql_connection():
             "https://", ""
         ),
         http_path=f"/sql/1.0/warehouses/{WAREHOUSE_ID}",
-        credentials_provider=(
-            workspace_client.config.oauth_credentials_provider
-        ),
+        credentials_provider=lambda: workspace_client.config.authenticate,
     )
 
 
