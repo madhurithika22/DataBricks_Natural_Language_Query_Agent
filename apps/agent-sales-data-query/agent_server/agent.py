@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 # NOTE: this will work for all databricks models OTHER than GPT-OSS, which uses a slightly different API
 set_default_openai_client(AsyncDatabricksOpenAI(use_ai_gateway=True))
-set_default_openai_api("chat_completions")
+set_default_openai_api("responses")
 set_trace_processors([])  # only use mlflow for trace processing
 mlflow.openai.autolog()
 logging.getLogger("mlflow.utils.autologging_utils").setLevel(logging.ERROR)
