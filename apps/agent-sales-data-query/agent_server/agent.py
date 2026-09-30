@@ -178,26 +178,119 @@ STRICT DATA-GROUNDING RULES:
     )
 
 
+
+def is_data_query_request(user_question: str) -> bool:
+    """
+    Identify questions that require querying actual sales records.
+
+    Schema questions are handled separately by the schema tool.
+    This guard prevents the model from inventing data results
+    while SQL execution is not yet connected.
+    """
+
+    question = user_question.lower().strip()
+
+    data_query_terms = [
+        "revenue",
+        "sales total",
+        "total sales",
+        "total amount",
+        "how many",
+        "how much",
+        "count of",
+        "number of",
+        "average",
+        "sum of",
+        "top customers",
+        "best customers",
+        "highest",
+        "lowest",
+        "most popular",
+        "least popular",
+        "which customer",
+        "which product",
+        "how many orders",
+        "show me the sales",
+        "list the customers",
+        "list the orders",
+    ]
+
+    schema_terms = [
+        "what tables",
+        "available tables",
+        "what columns",
+        "available columns",
+        "table structure",
+        "schema",
+        "relationship",
+        "relationships",
+        "data types",
+    ]
+
+    # Schema questions should continue to the agent.
+    if any(term in question for term in schema_terms):
+        return False
+
+    return any(term in question for term in data_query_terms)
+
+
 @invoke()
 async def invoke_handler(request: ResponsesAgentRequest) -> ResponsesAgentResponse:
     if session_id := get_session_id(request):
         mlflow.update_current_trace(metadata={"mlflow.trace.session": session_id})
-    # The agent runs inside an AsyncExitStack so any MCP servers stay open for the whole
-    # request. To give the agent MCP tools, connect them with connect_healthy_mcp_servers,
-    # which health-checks each server so one unavailable server can't crash the request
-    # (the Agents SDK lists each server's tools lazily inside Runner.run):
-    #   servers, unavailable = await connect_healthy_mcp_servers(
-    #       stack, [await init_mcp_server(WorkspaceClient())])
-    #   agent = create_agent(mcp_servers=servers)
-    # WorkspaceClient() uses service principal credentials; use get_user_workspace_client()
-    # for on-behalf-of user authentication.
+
+    messages = normalize_history_items([i.model_dump() for i in request.input])
+
+    # Find the latest user message.
+    latest_user_message = ""
+
+    for message in reversed(messages):
+        if isinstance(message, dict) and message.get("role") == "user":
+            content = message.get("content", "")
+
+            if isinstance(content, str):
+                latest_user_message = content
+            elif isinstance(content, list):
+                text_parts = [
+                    item.get("text", "")
+                    for item in content
+                    if isinstance(item, dict)
+                    and item.get("type") in ("text", "input_text")
+                ]
+                latest_user_message = " ".join(text_parts)
+
+            break
+
+    # Deterministically block data queries until SQL execution is connected.
+    if is_data_query_request(latest_user_message):
+        final_answer = (
+            "I can identify the database tables, columns, and relationships, "
+            "but I cannot yet query sales records to calculate this result. "
+            "I will not guess a number or invent database fields. "
+            "Actual data-query execution is not connected yet."
+        )
+
+        return ResponsesAgentResponse(
+            output=[
+                {
+                    "type": "message",
+                    "id": f"msg-{datetime.now().timestamp()}",
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "output_text",
+                            "text": final_answer,
+                        }
+                    ],
+                }
+            ]
+        )
+
+    # Continue normal agent processing for schema and general questions.
     async with AsyncExitStack() as stack:
         agent = create_agent()
-        messages = normalize_history_items([i.model_dump() for i in request.input])
         result = await Runner.run(agent, messages)
 
-        # Return only the final user-facing answer.
-        # GPT-OSS may include reasoning content blocks that are not plain text.
         final_answer = result.final_output
 
         if not isinstance(final_answer, str):
