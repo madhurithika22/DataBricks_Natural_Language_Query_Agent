@@ -18,6 +18,7 @@ from mlflow.types.responses import (
 )
 
 from agent_server.history import normalize_history_items
+from agent_server.data_query import answer_data_question
 from agent_server.schema_discovery import get_schema_context
 from agent_server.utils import (
     build_mcp_url,
