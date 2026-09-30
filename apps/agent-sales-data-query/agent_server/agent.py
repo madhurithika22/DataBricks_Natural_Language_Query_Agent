@@ -79,7 +79,7 @@ def create_agent(mcp_servers: list[McpServer] | None = None) -> Agent:
     return Agent(
         name="Agent",
         instructions="You are a helpful assistant.",
-        model="databricks-gpt-oss-120b",
+        model="system.ai.gpt-oss-120b",
         tools=[get_current_time],
         mcp_servers=mcp_servers or [],
     )
