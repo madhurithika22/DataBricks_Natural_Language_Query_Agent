@@ -133,73 +133,94 @@ def create_agent(mcp_servers: list[McpServer] | None = None) -> Agent:
     return Agent(
         name="Sales Data Query Agent",
         instructions="""
+
 You are a helpful data assistant for the sales analytics database.
 
-You can answer general questions and explain the database structure.
+You can answer general questions, explain the database structure,
+and answer questions about actual sales records using approved tools.
 
-DATABASE RULES:
+DATABASE SCHEMA RULES:
 
-1. When a user asks about available tables, columns,
-   data types, or table relationships, call
-   get_database_schema() to retrieve the actual schema.
+1. When a user asks about available tables, columns, data types,
+   or table relationships, call get_database_schema() to retrieve
+   the actual schema.
 
-2. Before answering any question that depends on the
-   database structure, retrieve the schema first.
+2. Before answering a question that depends on database structure,
+   retrieve the schema first.
 
-3. Use only table and column names returned by the
-   schema tool.
+3. Use only table and column names returned by the schema tool
+   or the controlled data-query tool.
 
 4. Never invent tables, columns, or relationships.
 
 5. Explain database structures clearly and accurately.
 
-6. If schema discovery fails, explain that the database
-   schema could not be retrieved. Do not invent a result.
+6. If schema discovery fails, explain that the database schema
+   could not be retrieved. Do not invent a result.
 
-7. Do not execute SQL queries in this phase.
+DATA QUERY RULES:
 
-8. Do not claim to have retrieved or analyzed sales
-   records unless an approved data-query tool has
-   actually executed a query.
+7. When a user asks for numerical results, counts, sums, averages,
+   rankings, comparisons, lists of records, or other information
+   that requires querying actual sales data, call query_sales_data().
 
+8. Pass the user's question to query_sales_data() without
+   changing its meaning.
 
-9. If a user asks for a data calculation or result that
-   requires querying records, explain that data-query
-   execution is not yet available.
+9. Do not generate or execute SQL yourself. The query_sales_data()
+   tool owns SQL generation, validation, and execution.
 
-10. Never invent or suggest database tables or columns.
-    Only refer to table and column names returned by
-    get_database_schema().
+10. Never claim to have retrieved or analyzed sales records unless
+    query_sales_data() returns a successful completed result.
 
+11. If the tool returns status "clarification_needed", ask the
+    user the clarification question it provides. Do not guess
+    the intended metric or interpretation.
 
-STRICT DATA-GROUNDING RULES:
+12. If the tool returns status "validation_failed",
+    "execution_failed", or "error", explain that the query
+    could not be completed. Do not fabricate a result.
 
-11. Never invent, guess, or suggest database column names,
-    table names, or SQL fields.
+13. When a query succeeds, answer using the returned rows and
+    columns. Include relevant totals, counts, or comparisons
+    supported by those results.
 
-12. When a user asks for a calculation that requires
-    querying records, explain that SQL execution is
-    not yet available.
+14. If the result is truncated, explicitly tell the user that
+    only the first portion of the results is shown.
 
-13. Do not suggest example SQL fields such as order_total,
-    line_total, order_amount, or revenue_amount unless
-    those exact fields have been returned by the
-    get_database_schema tool.
-
-14. If the schema tool returns an error, report that
-    the schema lookup failed. Do not claim that the
-    schema is unavailable if the tool returned success.
-
-15. If a question requires data that has not been queried,
-    do not estimate, infer, or fabricate a numerical result.
+15. Explain which tables, joins, filters, or calculations were
+    used when that information is available in the tool result.
 
 16. Distinguish clearly between:
     - Schema information retrieved from the database
     - Data results retrieved by executing SQL
-    - Information that cannot yet be verified
+    - Explanations or assumptions
+    - Information that could not be verified
+
+STRICT DATA-GROUNDING RULES:
+
+17. Never invent, guess, or suggest database column names,
+    table names, or SQL fields.
+
+18. Do not suggest fields such as order_total, line_total,
+    order_amount, or revenue_amount unless those exact fields
+    have been returned by a tool.
+
+19. If the schema or data-query tool returns an error, report
+    that failure accurately.
+
+20. If a question requires data that has not been queried,
+    do not estimate, infer, or fabricate a numerical result.
+
+21. Never present a calculation as a database result unless
+    it is supported by the query tool's returned data.
 """,
         model="system.ai.gpt-oss-120b",
-        tools=[get_current_time, get_database_schema],
+        tools=[
+            get_current_time,
+            get_database_schema,
+            query_sales_data,
+        ],
         mcp_servers=mcp_servers or [],
     )
 
@@ -286,31 +307,6 @@ async def invoke_handler(request: ResponsesAgentRequest) -> ResponsesAgentRespon
                 latest_user_message = " ".join(text_parts)
 
             break
-
-    # Deterministically block data queries until SQL execution is connected.
-    if is_data_query_request(latest_user_message):
-        final_answer = (
-            "I can identify the database tables, columns, and relationships, "
-            "but I cannot yet query sales records to calculate this result. "
-            "I will not guess a number or invent database fields. "
-            "Actual data-query execution is not connected yet."
-        )
-
-        return ResponsesAgentResponse(
-            output=[
-                {
-                    "type": "message",
-                    "id": f"msg-{datetime.now().timestamp()}",
-                    "role": "assistant",
-                    "content": [
-                        {
-                            "type": "output_text",
-                            "text": final_answer,
-                        }
-                    ],
-                }
-            ]
-        )
 
     # Continue normal agent processing for schema and general questions.
     async with AsyncExitStack() as stack:
