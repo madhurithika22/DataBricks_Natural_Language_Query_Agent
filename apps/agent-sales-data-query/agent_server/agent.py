@@ -102,7 +102,29 @@ async def invoke_handler(request: ResponsesAgentRequest) -> ResponsesAgentRespon
         agent = create_agent()
         messages = normalize_history_items([i.model_dump() for i in request.input])
         result = await Runner.run(agent, messages)
-        return ResponsesAgentResponse(output=[item.to_input_item() for item in result.new_items])
+
+        # Return only the final user-facing answer.
+        # GPT-OSS may include reasoning content blocks that are not plain text.
+        final_answer = result.final_output
+
+        if not isinstance(final_answer, str):
+            final_answer = str(final_answer)
+
+        return ResponsesAgentResponse(
+            output=[
+                {
+                    "type": "message",
+                    "id": f"msg-{datetime.now().timestamp()}",
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "output_text",
+                            "text": final_answer,
+                        }
+                    ],
+                }
+            ]
+        )
 
 
 @stream()
