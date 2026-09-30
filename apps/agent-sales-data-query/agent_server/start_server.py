@@ -9,9 +9,42 @@ load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env", override=True)
 # Need to import the agent to register the functions with the server
 import agent_server.agent  # noqa: E402
 
+
 agent_server = AgentServer("ResponsesAgent", enable_chat_proxy=True)
+
 # Define the app as a module level variable to enable multiple workers
 app = agent_server.app  # noqa: F841
+
+
+# ---------------------------------------------------------
+# Temporary schema-discovery diagnostic endpoint
+# ---------------------------------------------------------
+
+from agent_server.schema_discovery import (
+    discover_tables,
+    discover_columns,
+    discover_full_schema,
+    discover_relationships,
+    get_schema_context,
+)
+
+
+@app.get("/debug/schema")
+def debug_schema():
+    """
+    Temporary endpoint for validating SQL Warehouse
+    schema discovery. Remove after testing.
+    """
+
+    return {
+        "tables": discover_tables(),
+        "customers_columns": discover_columns("customers"),
+        "full_schema": discover_full_schema(),
+        "relationships": discover_relationships(),
+        "schema_context": get_schema_context(),
+    }
+
+
 setup_mlflow_git_based_version_tracking()
 
 
