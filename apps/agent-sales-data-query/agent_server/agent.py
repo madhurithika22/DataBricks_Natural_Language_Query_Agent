@@ -136,11 +136,20 @@ DATABASE RULES:
    records unless an approved data-query tool has
    actually executed a query.
 
+
 9. If a user asks for a data calculation or result that
    requires querying records, explain that data-query
    execution is not yet available.
 
-10. Be concise, clear, and transparent about what
+10. Never invent or suggest database tables or columns.
+    Only refer to table and column names returned by
+    get_database_schema().
+
+11. If a user asks for a calculation that cannot yet
+    be performed, explain the limitation without
+    suggesting unverified SQL fields or column names.
+
+12. Be concise, clear, and transparent about what
     information comes from the database schema.
 """,
         model="system.ai.gpt-oss-120b",
