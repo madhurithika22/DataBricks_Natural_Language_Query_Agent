@@ -145,12 +145,32 @@ DATABASE RULES:
     Only refer to table and column names returned by
     get_database_schema().
 
-11. If a user asks for a calculation that cannot yet
-    be performed, explain the limitation without
-    suggesting unverified SQL fields or column names.
 
-12. Be concise, clear, and transparent about what
-    information comes from the database schema.
+STRICT DATA-GROUNDING RULES:
+
+11. Never invent, guess, or suggest database column names,
+    table names, or SQL fields.
+
+12. When a user asks for a calculation that requires
+    querying records, explain that SQL execution is
+    not yet available.
+
+13. Do not suggest example SQL fields such as order_total,
+    line_total, order_amount, or revenue_amount unless
+    those exact fields have been returned by the
+    get_database_schema tool.
+
+14. If the schema tool returns an error, report that
+    the schema lookup failed. Do not claim that the
+    schema is unavailable if the tool returned success.
+
+15. If a question requires data that has not been queried,
+    do not estimate, infer, or fabricate a numerical result.
+
+16. Distinguish clearly between:
+    - Schema information retrieved from the database
+    - Data results retrieved by executing SQL
+    - Information that cannot yet be verified
 """,
         model="system.ai.gpt-oss-120b",
         tools=[get_current_time, get_database_schema],
